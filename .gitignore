@@ -1,0 +1,17 @@
+﻿__pycache__/
+*.pyc
+.env
+volumes/milvus/*
+!volumes/milvus/.gitkeep
+volumes/etcd/*
+!volumes/etcd/.gitkeep
+volumes/minio/*
+!volumes/minio/.gitkeep
+volumes/model_cache/*
+!volumes/model_cache/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/embeddings/*
+!data/embeddings/.gitkeep
