@@ -1,0 +1,64 @@
+{
+  "dataset_name": "Synthetic Benchmarks for 064557a9-4e42-46c4-b721-5e850447d244",
+  "version": "1.0",
+  "samples": [
+    {
+      "sample_id": "synth_064557a9-4e42-46c4-b721-5e850447d244_1",
+      "query": "What role does data play according to the text?",
+      "ground_truth_doc_ids": [
+        "064557a9-4e42-46c4-b721-5e850447d244"
+      ],
+      "ground_truth_answer": "This lecture focuses on the key considerations involved in designing a data store or data repository for business operations and data analysis.Types of Data StoresData repositories include databases, data warehouses, data marts, big data stores, and data lakes.Databases are categorized as relational (structured data with schema) and non-relational or NoSQL (semi-structured or unstructured data), with NoSQL types including key-value, document, column, and graph databases.Data Volume and UsageData",
+      "relevant_keywords": [
+        "data",
+        "databases",
+        "key",
+        "types",
+        "relational"
+      ]
+    },
+    {
+      "sample_id": "synth_064557a9-4e42-46c4-b721-5e850447d244_2",
+      "query": "Explain how data works and what it provides.",
+      "ground_truth_doc_ids": [
+        "064557a9-4e42-46c4-b721-5e850447d244"
+      ],
+      "ground_truth_answer": "umn, and graph databases.Data Volume and UsageData lakes are suitable for storing large volumes of raw data in native formats without predefined schema.Big data stores handle high-volume, high-velocity, and diverse data types with distributed processing.The intended use of data (transactional vs.",
+      "relevant_keywords": [
+        "data",
+        "design",
+        "volume",
+        "high",
+        "umn"
+      ]
+    },
+    {
+      "sample_id": "synth_064557a9-4e42-46c4-b721-5e850447d244_3",
+      "query": "What are the key points regarding performance?",
+      "ground_truth_doc_ids": [
+        "064557a9-4e42-46c4-b721-5e850447d244"
+      ],
+      "ground_truth_answer": "normalization, indexing, partitioning, and scalability to optimize performance.Storage considerations focus on performance (throughput and latency), availability, data integrity, and recoverability.Security, Privacy, and GovernanceA layered security approach includes access control, encryption, data management, and monitoring.Compliance with regulations like GDPR, CCPA, and HIPAA is essential and should be integrated into the design from the start to avoid patchwork solutions.",
+      "relevant_keywords": [
+        "performance",
+        "data",
+        "security",
+        "normalization",
+        "indexing"
+      ]
+    },
+    {
+      "sample_id": "synth_064557a9-4e42-46c4-b721-5e850447d244_4",
+      "query": "How does the document describe avoid in relation to patchwork?",
+      "ground_truth_doc_ids": [
+        "064557a9-4e42-46c4-b721-5e850447d244"
+      ],
+      "ground_truth_answer": "rt to avoid patchwork solutions.",
+      "relevant_keywords": [
+        "avoid",
+        "patchwork",
+        "solutions"
+      ]
+    }
+  ]
+}
