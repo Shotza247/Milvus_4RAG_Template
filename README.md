@@ -405,6 +405,8 @@ All components are decoupled behind abstract base classes in [`app/services/inte
 ---
 
 ## REST API Documentation & Endpoints
+<img width="480" height="470" style="center" alt="Screenshot 2026-10-08 195340" src="https://github.com/user-attachments/assets/0f46fc2a-292f-4af8-b77e-38d24af077ff" />
+
 
 ### 1. Ingest Text Snippet
 ```http
