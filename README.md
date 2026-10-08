@@ -23,56 +23,88 @@ Supports containerized deployment via both **Podman** (`podman compose` / `podma
 
 ## Architecture & System Flow
 
-```
-                      +---------------------------------------------+
-                      |         User / Client / REST Consumer       |
-                      +---------------------------------------------+
-                                      |                |
-                       (Port :8502)   v                v  (Port :8000)
-                +--------------------------+    +--------------------------------+
-                |     Streamlit Studio     |--->|       FastAPI Backend API      |
-                | (Sidebar Ingest + 3 Tabs)|    |    (/api/v1 Health, Search,    |
-                +--------------------------+    |     Docs, Collections, Eval)   |
-                                                +--------------------------------+
-                                                               |
-    +----------------------------------------------------------+----------------------------------------------------------+
-    |                                                          |                                                          |
-    v                                                          v                                                          v
-+-------------------------+                       +-------------------------+                        +-------------------------+
-|    Document Processor   |                       |    Embedding Service    |                        |   Cross-Encoder Rerank  |
-| - Multi-Format Parsers  |                       | - Sentence-Transformers |                        | - BAAI/bge-reranker-base|
-|   (PDF, DOCX, TXT, MD)  |                       | - FastEmbed / API       |                        | - Sigmoid Normalization |
-| - Recursive Chunker     |                       | - Unit-Normalized Vector|                        | - Threshold Filtering   |
-+-------------------------+                       +-------------------------+                        +-------------------------+
-    |                                                          |                                                          |
-    +----------------------------------------------------------+----------------------------------------------------------+
-                                                               |
-                                                               v
-                                        +---------------------------------------------+
-                                        |  Abstract Interfaces (app/services/interfaces.py)
-                                        |  - BaseVectorStore   - BaseEmbeddingService |
-                                        |  - BaseReranker      - BaseEvaluator        |
-                                        +---------------------------------------------+
-                                                               |
-                                                               v (PyMilvus Driver)
-                                        +---------------------------------------------+
-                                        |   Milvus Vector Store Service               |
-                                        |   - Dynamic HNSW / IVF_FLAT Indexing        |
-                                        |   - Auto-Reconnection & Schema Management   |
-                                        +---------------------------------------------+
-                                                               | (gRPC :19530)
-                                                               v
-                                        +---------------------------------------------+
-                                        |      Milvus Standalone Container Stack      |
-                                        |   - milvus-standalone (:19530 / :9091)      |
-                                        |   - Embedded etcd & Local Storage / MinIO   |
-                                        +---------------------------------------------+
-                                                               |
-                                                               v
-                                        +---------------------------------------------+
-                                        |         Host Persistent Volumes             |
-                                        |      ./volumes/milvus, etcd, minio          |
-                                        +---------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph UI_Layer [Client & User Interface]
+        Client[REST API Consumer / Client]
+        StreamlitUI[Streamlit Studio UI :8502]
+    end
+
+    subgraph API_Layer [FastAPI Backend Service :8000]
+        Router[FastAPI API Router /api/v1]
+        DocRouter[Documents Router]
+        SearchRouter[Search Router]
+        EvalRouter[Evaluation Router]
+        HealthRouter[Health Router]
+        
+        Router --> DocRouter
+        Router --> SearchRouter
+        Router --> EvalRouter
+        Router --> HealthRouter
+    end
+
+    subgraph Service_Layer [Modular Service Engine]
+        DocProc[Document Processor: PDF, DOCX, TXT, MD]
+        EmbedSvc[Embedding Service: SentenceTransformers / FastEmbed]
+        RerankSvc[Cross-Encoder Reranker: BAAI/bge-reranker-base]
+        SynthGen[Synthetic Benchmark Generator: Option B]
+        EvalEngine[Evaluation Engine: IR Metrics & RAG Triad]
+    end
+
+    subgraph Abstraction_Layer [Extensible Interfaces]
+        IVecStore[BaseVectorStore Interface]
+        IEmbed[BaseEmbeddingService Interface]
+        IRerank[BaseReranker Interface]
+        IEval[BaseEvaluator Interface]
+    end
+
+    subgraph Vector_Adapter [Milvus Adapter]
+        MilvusDriver[PyMilvus Concrete Service]
+        ConnManager[Connection Pool & Auto-Reconnect]
+    end
+
+    subgraph Infrastructure [Container Orchestration: Podman / Docker]
+        MilvusCore[Milvus Standalone Engine :19530 / :9091]
+        EtcdMeta[etcd Metadata Storage :2379]
+        MinIOObj[MinIO Object Storage :9000 / :9001]
+        AttuUI[Attu Web UI Manager :3000]
+    end
+
+    subgraph Persistence [Host Storage Volumes]
+        VolMilvus[(volumes/milvus)]
+        VolEtcd[(volumes/etcd)]
+        VolMinIO[(volumes/minio)]
+        DataRaw[(data/raw)]
+    end
+
+    %% Flow Connections
+    Client -->|HTTP / JSON| Router
+    StreamlitUI -->|HTTP Requests| Router
+    
+    DocRouter --> DocProc
+    DocRouter --> EmbedSvc
+    DocRouter --> IVecStore
+    
+    SearchRouter --> EmbedSvc
+    SearchRouter --> IVecStore
+    SearchRouter --> RerankSvc
+    
+    EvalRouter --> SynthGen
+    EvalRouter --> EvalEngine
+    EvalEngine --> IVecStore
+    EvalEngine --> RerankSvc
+
+    DocProc --> DataRaw
+    IVecStore --> MilvusDriver
+    MilvusDriver --> ConnManager
+    ConnManager -->|gRPC :19530| MilvusCore
+    
+    MilvusCore --> EtcdMeta
+    MilvusCore --> MinIOObj
+    MilvusCore --> VolMilvus
+    EtcdMeta --> VolEtcd
+    MinIOObj --> VolMinIO
+    AttuUI -->|Admin Inspect| MilvusCore
 ```
 
 ---
@@ -241,19 +273,25 @@ Standard dense vector similarity search (Bi-Encoders) is fast, but vector dot pr
 
 This template uses a **2-Stage Pipeline**:
 
-```
-[User Query]
-     │
-     ├───► [Embedding Service] ──► [Milvus HNSW Vector Search] ──► Retrieves Top-K (e.g. 20 candidates)
-     │                                                                       │
-     └───────────────────────────────────────────────────────────────────────┴──► [Cross-Encoder Reranker]
-                                                                                        │
-                                                                                 [Sigmoid Normalization]
-                                                                                        │
-                                                                                 [Score Threshold Cut-off]
-                                                                                        │
-                                                                                        ▼
-                                                                           Top-N High-Confidence Chunks (e.g. 5)
+```mermaid
+flowchart TD
+    UserQuery([User Query Text]) --> EmbedModule[Embedding Service: all-MiniLM-L6-v2]
+    UserQuery --> RerankModule[Cross-Encoder: BAAI/bge-reranker-base]
+
+    EmbedModule -->|384-d Dense Vector| MilvusHNSW[Stage 1: Milvus Vector Search - HNSW]
+    MilvusHNSW -->|Coarse Top-K Candidates e.g. K=20| CandidatePool[Candidate Chunks + Vector Cosine Scores]
+    
+    CandidatePool --> RerankModule
+    
+    subgraph Reranking_Pipeline [Stage 2: Fine Re-ranking & Calibration]
+        RerankModule --> TokenCrossAttention[Full Query-Document Self-Attention]
+        TokenCrossAttention --> SigmoidNorm[Sigmoid Score Normalization 0 to 1]
+        SigmoidNorm --> CutoffThreshold{Score >= Threshold e.g. 0.35?}
+        CutoffThreshold -->|Yes| ValidChunks[Ranked Relevant Chunks]
+        CutoffThreshold -->|No| DiscardedNoise[Filtered Out Low-Confidence Noise]
+    end
+
+    ValidChunks -->|Slice Top-N e.g. N=5| FinalContext([High-Precision RAG Context Output])
 ```
 
 1. **Stage 1 (Coarse Search)**: Milvus retrieves the top $K$ candidates (e.g., $K=20$) in milliseconds.
@@ -268,6 +306,34 @@ This template uses a **2-Stage Pipeline**:
 Standard benchmarks use static queries that do not match the specific documents you just uploaded.
 
 ### The Solution: Option B (Synthetic Generation)
+
+```mermaid
+flowchart TD
+    RawDoc[Source Document: PDF / TXT / DOCX / MD] --> DocChunker[Document Processor & Chunker]
+    DocChunker --> Chunks[Document Chunks]
+    
+    subgraph Benchmark_Generation [Synthetic Generation Engine]
+        Chunks --> KeyExtract[Salient Sentence & Keyword Extractor]
+        KeyExtract --> QGen[Question & Ground-Truth Fact Formulator]
+        QGen --> GoldenSuite[(Golden Benchmark Suite: Query + Doc IDs + Target Facts)]
+    end
+
+    GoldenSuite --> EvalOrchestrator[Comparative Evaluation Runner]
+    
+    subgraph Stage1_Eval [Stage 1: Milvus Vector Search]
+        EvalOrchestrator --> MilvusSearch[Milvus Cosine Search]
+        MilvusSearch --> S1_Metrics[S1 Metrics: Hit Rate, MRR, NDCG, Triad]
+    end
+    
+    subgraph Stage2_Eval [Stage 2: Cross-Encoder Reranking]
+        MilvusSearch --> Reranker[BGE-Reranker-Base]
+        Reranker --> S2_Metrics[S2 Metrics: Hit Rate, MRR, NDCG, Triad]
+    end
+
+    S1_Metrics --> ReportComp[Comparative Accuracy Gain Report]
+    S2_Metrics --> ReportComp
+```
+
 1. **Upload your document** via the Streamlit sidebar.
 2. In **Tab 2**, click **`🪄 Generate Document Benchmark Suite`**.
 3. The engine extracts salient factual statements and automatically generates 5–15 realistic question-answer-keyword test pairs derived directly from your document.
