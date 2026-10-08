@@ -6,6 +6,18 @@ The architecture uses strict interface decoupling (`BaseVectorStore`, `BaseEmbed
 
 Supports containerized deployment via both **Podman** (`podman compose` / `podman-compose`) and **Docker** (`docker compose`), as well as native host execution.
 
+## ⚡ High level-View Enterprise Milvus RAG & Evaluation Studio
+
+A production-grade, reusable **Retrieval-Augmented Generation (RAG)** template powered by:
+- 🏛️ **Milvus Standalone Vector Database** (HNSW Cosine Indexing)
+- ⚡ **2-Stage Retrieval Pipeline** (Coarse Milvus Search $\rightarrow$ Deep Cross-Encoder Re-Ranking via `BAAI/bge-reranker-base`)
+- 🤖 **Conversational Synthesis** (`gpt-5.1` / OpenAI with citation markers `[Source 1]`, `[Source 2]` and offline fallback)
+- 📊 **Real-Time 3-Pillar RAG Triad Assessment** (Context Relevance, Faithfulness/Groundedness, Answer Relevance)
+- 🧪 **Option B Synthetic Test Generator** (Automatically extracts facts from your documents to create custom golden benchmark suites)
+- 💬 **Streamlit Chatbot Studio (`:8502`)** (Sidebar file upload + multi-turn conversational chat with live Triad meters)
+- 🐳 **Engine Agnostic** (Full support for **Podman Compose** and **Docker Compose**)
+- 🔌 **Pluggable Architecture** (Extensible interfaces to swap Milvus for Qdrant, Chroma, or PgVector in minutes)
+
 ---
 
 ## Table of Contents
